@@ -88,6 +88,10 @@ class Downloader:
             print("[%s] Download queued at %s" % (file_name, time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
             reply = await message.reply_text('In queue', quote=True)
             await self._queue.put([message, reply])
+        if message.text == "/cancel":
+            self._clean_up()
+            await message.reply_text("All downloads are has aborted")
+            print("Aborted all active downloads")
 
     def run(self) -> None:
         try:
