@@ -42,8 +42,11 @@ class Downloader:
 
     def _update_progress(self, current: int, total: int, *args) -> None:
         reply: Message = args[0]
+        quota =  int(current*100/total)
+        if quota % 5 != 0:
+            return
         try:
-            reply.edit(f"{current * 100 / total:.1f}%")
+            reply.edit(f"{quota}%")
         except:
             pass
 
