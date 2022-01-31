@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-from __future__ import annotations
+
 import os
 import sys
 import time
 import asyncio
-
+from typing import Union
 from asyncio import Task
 # Import the client
+
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pyrogram.handlers import MessageHandler
@@ -16,7 +17,8 @@ class Downloader:
 
     def __init__(self, session: str, api_id: int, api_hash: str, bot_token: str, download_path: str,
                  parallel_downloads: int,
-                 download_timeout: int) -> None:
+                 download_timeout: int,
+                 authorized_users: list) -> None:
         self._session = session
         self._api_id = api_id
         self._api_hash = api_hash
@@ -24,6 +26,7 @@ class Downloader:
         self._download_path = download_path
         self._parallel_downloads = parallel_downloads
         self._download_timeout = download_timeout
+        self._authorized_users = authorized_users
         self._create_workflow()
 
     def _clean_up(self) -> None:
@@ -42,12 +45,12 @@ class Downloader:
 
     def _update_progress(self, current: int, total: int, *args) -> None:
         reply: Message = args[0]
-        quota =  int(current*100/total)
-        if quota % 5 != 0:
+        quota = int(current * 100 / total)
+        if quota % 10 != 0:
             return
         try:
             reply.edit(f"{quota}%")
-        except:
+        finally:
             pass
 
     async def _worker(self, name):
@@ -56,7 +59,7 @@ class Downloader:
             queue_item = await self._queue.get()
             message: Message = queue_item[0]
             reply: Message = queue_item[1]
-            file_name = message.document.file_name
+            file_name = message.document.file_name if message.document else message.video.file_name
             file_path = os.path.join(self._download_path, file_name)
             await reply.edit('Downloading...')
             print("[%s] Download started at %s" % (file_name, time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
@@ -86,8 +89,9 @@ class Downloader:
 
     # This is our update handler. It is called when a new update arrives.
     async def _handler(self, client: Client, message: Message):
-        if message.media is not None:
-            file_name = message.document.file_name
+        if message.document or message.video is not None:
+            print("Received media")
+            file_name = message.document.file_name if message.document else message.video.file_name
             print("[%s] Download queued at %s" % (file_name, time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
             reply = await message.reply_text('In queue', quote=True)
             await self._queue.put([message, reply])
@@ -98,7 +102,10 @@ class Downloader:
 
     def run(self) -> None:
         try:
-            handler = MessageHandler(self._handler, filters.private)
+            msg_filter = filters.private
+            if self._authorized_users:
+                msg_filter = filters.private & filters.user(self._authorized_users)
+            handler = MessageHandler(self._handler, msg_filter)
             # Register the update handler so that it gets called
             self._client.add_handler(handler)
             # Run the client until Ctrl+C is pressed, or the client disconnects
@@ -107,13 +114,13 @@ class Downloader:
         finally:
             # Cancel our worker tasks.
             self._clean_up()
-            # Stop Telethon client
+            # Stop Pyrogram client
             print('Stopped!')
 
 
 # This is a helper method to access environment variables or
 # prompt the user to type them in the terminal if missing.
-def get_env(name: str, message: str, cast=str) -> str | int:
+def get_env(name: str, message: str, cast=str) -> Union[int, str]:
     if name in os.environ:
         return os.environ[name]
     while True:
@@ -134,7 +141,10 @@ def init_settings() -> []:
     download_path = get_env('TG_DOWNLOAD_PATH', 'Enter full path to downloads directory: ')
     parallel_downloads = int(os.environ.get('TG_MAX_PARALLEL', 4))
     download_timeout = int(os.environ.get('TG_DL_TIMEOUT', 5400))
-    return session, api_id, api_hash, bot_token, download_path, parallel_downloads, download_timeout
+    authorized_users = get_env('TG_AUTHORIZED_USER_ID',
+                               "Enter the list authorized users' id (separated by comma, empty for any): ")
+    authorized_users = authorized_users.split(",") if authorized_users else []
+    return session, api_id, api_hash, bot_token, download_path, parallel_downloads, download_timeout, authorized_users
 
 
 def main() -> None:
