@@ -50,7 +50,7 @@ class Downloader:
             return
         try:
             reply.edit(f"{quota}%")
-        finally:
+        except:
             pass
 
     async def _worker(self, name):
