@@ -104,7 +104,7 @@ class Downloader:
         try:
             msg_filter = filters.private
             if self._authorized_users:
-                msg_filter = filters.private & filters.user(self._authorized_users)
+                msg_filter = filters.private & filters.user(users=self._authorized_users)
             handler = MessageHandler(self._handler, msg_filter)
             # Register the update handler so that it gets called
             self._client.add_handler(handler)
@@ -143,7 +143,7 @@ def init_settings() -> []:
     download_timeout = int(os.environ.get('TG_DL_TIMEOUT', 5400))
     authorized_users = get_env('TG_AUTHORIZED_USER_ID',
                                "Enter the list authorized users' id (separated by comma, empty for any): ")
-    authorized_users = authorized_users.split(",") if authorized_users else []
+    authorized_users = [int(user_id) for user_id in authorized_users.split(",")] if authorized_users else []
     return session, api_id, api_hash, bot_token, download_path, parallel_downloads, download_timeout, authorized_users
 
 
