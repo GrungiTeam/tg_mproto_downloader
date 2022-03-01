@@ -60,6 +60,8 @@ class Downloader:
             message: Message = queue_item[0]
             reply: Message = queue_item[1]
             file_name = message.document.file_name if message.document else message.video.file_name
+            if not file_name:
+                file_name = f'{message.video.file_id}.{message.video.mime_type.split("/")[1]}'
             file_path = os.path.join(self._download_path, file_name)
             await reply.edit('Downloading...')
             print("[%s] Download started at %s" % (file_name, time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
@@ -92,6 +94,10 @@ class Downloader:
         if message.document or message.video is not None:
             print("Received media")
             file_name = message.document.file_name if message.document else message.video.file_name
+            if not file_name:
+                file_name = f'{message.video.file_id}.{message.video.mime_type.split("/")[1]}'
+                await message.reply_text(f'This video does not have a proper file name, setting to:\n {file_name}',
+                                         quote=True)
             print("[%s] Download queued at %s" % (file_name, time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
             reply = await message.reply_text('In queue', quote=True)
             await self._queue.put([message, reply])
